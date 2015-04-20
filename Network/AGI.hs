@@ -43,7 +43,7 @@ data AGIEnv = AGIEnv { agiVars :: [(String, String)]
                      }
 
 newtype AGIT m a = AGI { runAGIT :: ReaderT AGIEnv m a }
-    deriving (Monad, MonadIO, Functor, {- MonadError IOError, -} MonadReader AGIEnv)
+    deriving (Monad, MonadIO, Functor, MonadReader AGIEnv)
 
 type AGI = AGIT IO
 
@@ -66,17 +66,17 @@ data Digit
 -- |convert a 'Digit' to its ASCII representation
 ppDigit :: Digit -> Char
 ppDigit Pound = '#'
-ppDigit Star = '*'
-ppDigit Zero = '0'
-ppDigit One = '1'
-ppDigit Two = '2'
+ppDigit Star  = '*'
+ppDigit Zero  = '0'
+ppDigit One   = '1'
+ppDigit Two   = '2'
 ppDigit Three = '3'
-ppDigit Four = '4'
-ppDigit Five = '5'
-ppDigit Six = '6'
+ppDigit Four  = '4'
+ppDigit Five  = '5'
+ppDigit Six   = '6'
 ppDigit Seven = '7'
 ppDigit Eight = '8'
-ppDigit Nine = '9'
+ppDigit Nine  = '9'
 
 -- |convert a list of 'Digit's into a quoted string.
 -- The quoted string format is used by many AGI commands
@@ -99,7 +99,7 @@ data SoundType = WAV | GSM
 
 instance Show SoundType where
     show WAV = "wav"
-    show GSM  = "gsm"
+    show GSM = "gsm"
 
 -- TODO: let user install a custom sipHUP handler (sigHUP is sent when the caller hangs ups)
 -- |Top-level wrapper for single-shot AGI scripts.
@@ -126,7 +126,7 @@ run agi hupHandler =
 -- TODO: ability to listen on a specific IP address
 fastAGI :: Maybe PortID -> (HostName -> PortNumber -> AGI a) -> IO ()
 fastAGI portId agi =
-    do installHandler sigPIPE Ignore Nothing 
+    do installHandler sigPIPE Ignore Nothing
        s <- listenOn $ fromMaybe (PortNumber 4573) portId
        (forever $ (do (h, hostname, portNum) <- accept s
                       forkIO $ runInternal (agi hostname portNum) h h >> hClose h
@@ -148,10 +148,10 @@ runInternal agi inh outh =
        runReaderT (runAGIT agi) (AGIEnv vars inh outh)
 
 readAgiVars :: Handle -> IO [(String, String)]
-readAgiVars inh = 
-    do mAgiVar <- readAgiVar 
+readAgiVars inh =
+    do mAgiVar <- readAgiVar
        case mAgiVar of
-	    Nothing -> 
+	    Nothing ->
 		return []
 	    Just agiVar ->
 		do rest <- readAgiVars inh
@@ -177,11 +177,11 @@ sendRecv cmd =
 {-
 Usage: ANSWER
 
-Answers channel if not already in answer state. 
- 
-Returns: 
-failure: 200 result=-1 
-success: 200 result=0 
+Answers channel if not already in answer state.
+
+Returns:
+failure: 200 result=-1
+success: 200 result=0
 -}
 -- |'answer' channel if not already in answer state
 answer :: (MonadIO m) => AGIT m Bool -- ^ True on success, False on failure
@@ -189,18 +189,18 @@ answer =
     do res <- sendRecv "ANSWER"
        return $ parseResult (pResult >> pSuccessFailure) res
 {-
- Usage: HANGUP [<channelname>] 
+ Usage: HANGUP [<channelname>]
 
-Hangs up the specified channel. 
- 
-If no channel name is given, hangs up the current channel. 
- 
-Returns: 
-failure: 200 result=-1 
-success: 200 result=1 
+Hangs up the specified channel.
+
+If no channel name is given, hangs up the current channel.
+
+Returns:
+failure: 200 result=-1
+success: 200 result=1
 -}
 -- |hangUp the specified channel
-hangUp :: (MonadIO m) 
+hangUp :: (MonadIO m)
        => Maybe String -- ^ channel to hangup, or current channel if not specified
        -> AGIT m Bool
 hangUp mChannel =
@@ -210,12 +210,12 @@ hangUp mChannel =
 {-
 Usage: GET DATA <file to be streamed> [timeout] [max digits]
 
-Returns: 
-failure: 200 result=-1 
-timeout: 200 result=<digits> (timeout) 
-success: 200 result=<digits> 
- 
-<digits> is the digits pressed. 
+Returns:
+failure: 200 result=-1
+timeout: 200 result=<digits> (timeout)
+success: 200 result=<digits>
+
+<digits> is the digits pressed.
 
 -}
 
@@ -240,27 +240,27 @@ getData fp mTimeout mMaxDigits =
     in
       do res <- sendRecv cmd
          return $ parseResult p res
-             where 
+             where
                p = do pResult
                       (try pFail >> return Nothing) <|> (pDigitsWithTimeout >>= return . Just)
                pFail = string "-1"
 {-
 Usage: RECORD FILE <filename> <format> <escape digits> <timeout> [offset samples] [BEEP] [s=<silence>]
 
-Returns: 
-failure to write: 200 result=-1 (writefile) 
-failure on waitfor: 200 result=-1 (waitfor) endpos=<offset> 
-hangup: 200 result=0 (hangup) endpos=<offset> 
-interrrupted: 200 result=<digit> (dtmf) endpos=<offset> 
-timeout: 200 result=0 (timeout) endpos=<offset> 
-random error: 200 result=<error> (randomerror) endpos=<offset> 
- 
-<offset> is the end offset in the file being recorded. 
-<digit> is the ascii code for the digit pressed. 
-<error> ????? 
+Returns:
+failure to write: 200 result=-1 (writefile)
+failure on waitfor: 200 result=-1 (waitfor) endpos=<offset>
+hangup: 200 result=0 (hangup) endpos=<offset>
+interrrupted: 200 result=<digit> (dtmf) endpos=<offset>
+timeout: 200 result=0 (timeout) endpos=<offset>
+random error: 200 result=<error> (randomerror) endpos=<offset>
+
+<offset> is the end offset in the file being recorded.
+<digit> is the ascii code for the digit pressed.
+<error> ?????
 -}
 
-data RecordResult 
+data RecordResult
     = FailureToWrite
     | FailureOnWaitFor
     | HangUp
@@ -280,18 +280,18 @@ record :: (MonadIO m)
        -> Maybe Integer -- ^ stop recording if this many seconds of silence passes
        -> AGIT m (RecordResult, Integer) -- ^ exit condition, endpos=offset
 record fp soundType escapeDigits length offset beep silence =
-    do res <- sendRecv $ ("RECORD FILE " ++ fp ++ " " ++ show soundType ++ " " ++ 
-                          ppEscapeDigits escapeDigits ++ " " ++  (maybe "-1" show length) ++  
-                          (maybe "" (\o -> ' ': show o) offset) ++ 
+    do res <- sendRecv $ ("RECORD FILE " ++ fp ++ " " ++ show soundType ++ " " ++
+                          ppEscapeDigits escapeDigits ++ " " ++  (maybe "-1" show length) ++
+                          (maybe "" (\o -> ' ': show o) offset) ++
                           (if beep then " beep" else "") ++
                           (maybe "" (\s -> " s=" ++ show s) silence))
        return $ parseResult p res
 
 p = pResult >> (pFailureToWrite <|> pFailureOnWaitFor <|> pHangUp <|> pInterrupted <|> pTimeout <|> pRandomError)
     where
-      pFailureToWrite = 
+      pFailureToWrite =
           do try (string "-1 (writefile)") >> return (FailureToWrite, 0)
-      pFailureOnWaitFor = 
+      pFailureOnWaitFor =
           do try (string "-1 (waitfor)")
              pSpace
              ep <- pEndPos
@@ -322,21 +322,21 @@ p = pResult >> (pFailureToWrite <|> pFailureOnWaitFor <|> pHangUp <|> pInterrupt
 {-
  Usage: SAY DIGITS <number> <escape digits>
 
-Say a given digit string, returning early if any of the given DTMF digits are received on the channel. 
- 
-EXAMPLE: 
+Say a given digit string, returning early if any of the given DTMF digits are received on the channel.
 
-SAY DIGITS 5551212 "125#" 
+EXAMPLE:
 
- 
-The digits five, five, five, one, two, one, two will be spoken out, If durning the speech, the DTMF keys 1, 2, 5 or # are pressed it will stop the playback. 
- 
-Returns: 
-failure: 200 result=-1 
-success: 200 result=0 
-digit pressed: 200 result=<digit> 
- 
-<digit> is the ascii code for the digit pressed. 
+SAY DIGITS 5551212 "125#"
+
+
+The digits five, five, five, one, two, one, two will be spoken out, If durning the speech, the DTMF keys 1, 2, 5 or # are pressed it will stop the playback.
+
+Returns:
+failure: 200 result=-1
+success: 200 result=0
+digit pressed: 200 result=<digit>
+
+<digit> is the ascii code for the digit pressed.
 -}
 
 -- |say the given digit string
@@ -354,20 +354,20 @@ sayDigits digits escapeDigits =
 {-
 SAY NUMBER <number> <escape digits>
 
-Say a given number, returning early if any of the given DTMF digits are received on the channel. 
- 
-EXAMPLE: 
+Say a given number, returning early if any of the given DTMF digits are received on the channel.
 
- SAY NUMBER 1234 "1*#" 
+EXAMPLE:
 
-The number one thousand two hundred and thirty four will be spoken, and if the DTMFs 1, * or # is pressed during the speach it will be terminated. 
- 
-Returns: 
-failure: 200 result=-1 
-success: 200 result=0 
-digit pressed: 200 result=<digit> 
- 
-<digit> is the ascii code for the digit pressed. 
+ SAY NUMBER 1234 "1*#"
+
+The number one thousand two hundred and thirty four will be spoken, and if the DTMFs 1, * or # is pressed during the speach it will be terminated.
+
+Returns:
+failure: 200 result=-1
+success: 200 result=0
+digit pressed: 200 result=<digit>
+
+<digit> is the ascii code for the digit pressed.
 -}
 -- | 'sayNumber' says the specified number
 sayNumber :: (MonadIO m)
@@ -381,29 +381,29 @@ sayNumber number escapeDigits =
       p = do pResult
              (string "-1" >> return Nothing) <|> (string "0" >> return (Just Nothing)) <|> (pAsciiDigit >>= return . Just . Just)
 
-{- 
-Usage: STREAM FILE <filename> <escape digits> [sample offset] 
+{-
+Usage: STREAM FILE <filename> <escape digits> [sample offset]
 
-Send the given file, allowing playback to be interrupted by the given digits, if any. 
- 
-Use double quotes for the digits if you wish none to be permitted. 
- 
-If sample offset is provided then the audio will seek to sample offset before play starts. 
- 
-Remember, the file extension must not be included in the filename. 
- 
-Returns: 
-failure: 200 result=-1 endpos=<sample offset> 
-failure on open: 200 result=0 endpos=0 
-success: 200 result=0 endpos=<offset> 
-digit pressed: 200 result=<digit> endpos=<offset> 
- 
-<offset> is the stream position streaming stopped. If it equals <sample offset> there was probably an error. 
-<digit> is the ascii code for the digit pressed. 
- 
-Bugs 
-STREAM FILE is known to behave inconsistently, especially when used in conjuction with other languages, i.e. Set(LANGUAGE()=xy). 
-Workaround: Use EXEC PLAYBACK instead. 
+Send the given file, allowing playback to be interrupted by the given digits, if any.
+
+Use double quotes for the digits if you wish none to be permitted.
+
+If sample offset is provided then the audio will seek to sample offset before play starts.
+
+Remember, the file extension must not be included in the filename.
+
+Returns:
+failure: 200 result=-1 endpos=<sample offset>
+failure on open: 200 result=0 endpos=0
+success: 200 result=0 endpos=<offset>
+digit pressed: 200 result=<digit> endpos=<offset>
+
+<offset> is the stream position streaming stopped. If it equals <sample offset> there was probably an error.
+<digit> is the ascii code for the digit pressed.
+
+Bugs
+STREAM FILE is known to behave inconsistently, especially when used in conjuction with other languages, i.e. Set(LANGUAGE()=xy).
+Workaround: Use EXEC PLAYBACK instead.
 -}
 
 -- |playback the specified file, can be interupted by the given digits.
@@ -418,7 +418,7 @@ streamFile filePath escapeDigits mSampleOffset =
     do res <- sendRecv $ "STREAM FILE " ++ filePath ++ " " ++ ppEscapeDigits escapeDigits ++ (maybe "" (\so -> ' ' :  show so) mSampleOffset)
        return $ parseResult p res
     where
-      p = 
+      p =
           do pResult
              pFailure <|> pFailureOnOpen <|> pSuccess <|> pSuccessWithDigit
       pFailure =
@@ -441,21 +441,21 @@ streamFile filePath escapeDigits mSampleOffset =
              return (Right ((Just d), ep))
 
 {-
-Usage: WAIT FOR DIGIT <timeout> 
+Usage: WAIT FOR DIGIT <timeout>
 
-Waits up to <timeout> milliseconds for channel to receive a DTMF digit. 
- 
-Use -1 for the <timeout> value if you desire the call to block indefinitely. 
- 
-Returns: 
-failure: 200 result=-1 
-timeout: 200 result=0 
-success: 200 result=<digit> 
- 
-<digit> is the ascii code for the digit received. 
+Waits up to <timeout> milliseconds for channel to receive a DTMF digit.
+
+Use -1 for the <timeout> value if you desire the call to block indefinitely.
+
+Returns:
+failure: 200 result=-1
+timeout: 200 result=0
+success: 200 result=<digit>
+
+<digit> is the ascii code for the digit received.
 -}
 
--- |wait for channel to receive a DTMF digit. 
+-- |wait for channel to receive a DTMF digit.
 --
 -- See also: 'getData' for multiple digits
 waitForDigit :: (MonadIO m)
@@ -466,11 +466,13 @@ waitForDigit timeout =
        return $ parseResult p res
     where
       p = do pResult
-             (string "-1" >> return Nothing) <|> (string "0" >> return (Just Nothing)) <|> (pAsciiDigit >>= return . Just . Just)
+             (string "-1" >> return Nothing) <|>
+             (string "0" >> return (Just Nothing)) <|>
+             (pAsciiDigit >>= return . Just . Just)
 
 
 -- * Result Parsers
-parseResult p res = 
+parseResult p res =
     case parse p res res of
       (Left e) -> error (show e) -- throwError (userError (show e))
       (Right r) -> r
@@ -497,14 +499,14 @@ pDigitsWithTimeout =
 pDigit :: CharParser () Digit
 pDigit =
     (char '#' >> return Pound) <|>
-    (char '*' >> return Star) <|>
-    (char '0' >> return Zero) <|>
-    (char '1' >> return One) <|>
-    (char '2' >> return Two) <|>
+    (char '*' >> return Star)  <|>
+    (char '0' >> return Zero)  <|>
+    (char '1' >> return One)   <|>
+    (char '2' >> return Two)   <|>
     (char '3' >> return Three) <|>
-    (char '4' >> return Four) <|>
-    (char '5' >> return Five) <|>
-    (char '6' >> return Six) <|>
+    (char '4' >> return Four)  <|>
+    (char '5' >> return Five)  <|>
+    (char '6' >> return Six)   <|>
     (char '7' >> return Seven) <|>
     (char '8' >> return Eight) <|>
     (char '9' >> return Nine)
