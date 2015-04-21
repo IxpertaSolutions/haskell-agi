@@ -5,6 +5,7 @@ module Network.AGI
     , ppEscapeDigits
     , digitsToInteger
     , AGI
+    , AGIEnv(..)
     , run
     , fastAGI
     , runInternal
