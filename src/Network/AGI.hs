@@ -468,8 +468,8 @@ waitForDigit timeout =
     where
       p = do pResult
              (string "-1" >> return Nothing) <|>
-             (string "0" >> return (Just Nothing)) <|>
-             (pAsciiDigit >>= return . Just . Just)
+               (string "0" >> return (Just Nothing)) <|>
+               (pAsciiDigit >>= return . Just . Just)
 
 
 -- * Result Parsers
