@@ -1,5 +1,5 @@
 .PHONY: all
-all: dist
+all: .cabal-sandbox
 	cabal build
 
 .PHONY: clean
@@ -11,6 +11,6 @@ distclean:
 	cabal clean
 	cabal sandbox delete
 
-dist:
+.cabal-sandbox:
 	cabal sandbox init
 	cabal install --dependencies-only
