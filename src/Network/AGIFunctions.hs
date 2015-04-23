@@ -391,7 +391,10 @@ waitForDigit timeout =
              liftM (Just . Just) pAsciiDigit
 
 {-
-Usage: EXEC Dial "IAX2/alice|20"
+Usage: EXEC Dial "IAX2/alice,20"
+
+In some documentations is: EXEC Dial "IAX2/alice|20" which is wrong! Asterisk
+it self asks for coma separation.
 
 
 Executes application with given options.
@@ -408,10 +411,13 @@ success: 200 result=<app_return_code>
 exec :: (MonadIO m) => String -> [String] -> AGIT m (Maybe Integer)
 exec app []   = return Nothing
 exec app args =
-    do res <- sendRecv $ "EXEC \"|" ++ (mconcat $ map (++ "|") args)
+    do res <- sendRecv $ "EXEC " ++ app ++ "\"" ++ params ++ "\""
        return $ parseResult p res
   where
     p = do pResult
            (string "-2" >> return Nothing) <|>
              (do retVal <- integer
                  return $ Just retVal)
+    params = case args of
+                [arg] -> arg
+                args  -> mconcat $ map (++ ",") args
