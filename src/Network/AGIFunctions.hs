@@ -7,6 +7,7 @@ module Network.AGIFunctions
     , streamFile
     , record
     , waitForDigit
+    , exec
     )
   where
 
