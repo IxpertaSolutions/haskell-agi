@@ -6,7 +6,7 @@ module BasicCall
 -- Standard Haskell Modules
 
 import Control.Concurrent
-import Control.Monad.Trans.Reader
+import Control.Monad.Reader
 import Control.Monad
 import Data.Maybe
 import Data.Word
@@ -24,7 +24,7 @@ import Network.AGIFunctions
 
 main :: IO ()
 main =
-       fastAGI (Just 4000) mainAGI
+       fastAGI (Just $ PortNumber 4000) mainAGI
 
 mainAGI :: HostName -> PortNumber -> AGI ()
 mainAGI _ _= do
