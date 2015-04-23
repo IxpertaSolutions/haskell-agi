@@ -8,10 +8,87 @@ module Network.AGIFunctions
     , record
     , waitForDigit
     )
+  where
 
+import Network.Type.AGI
 import Network.AGI
 
+import Control.Monad
+import Control.Monad.Trans
+import Control.Monad.Reader
+import Control.Monad.Error
+import Data.Monoid
+import Data.Char
+import System.IO
 import Text.ParserCombinators.Parsec
+import Text.Parsec.Token
+
+-- * Result Parsers
+parseResult p res =
+    case parse p res res of
+      (Left e) -> error (show e) -- throwError (userError (show e))
+      (Right r) -> r
+
+-- |parse 0 as True, -1 as failure
+pSuccessFailure :: CharParser () Bool
+pSuccessFailure =
+    (char '0' >> return True) <|> (string "-1" >> return False)
+
+-- |parse '200 result='
+pResult :: CharParser () String
+pResult = string "200 result="
+
+-- |parse a block of zero or more ' ' and '\t' characters (but not '\n')
+pSpace :: CharParser () String
+pSpace = many (tab <|> char ' ')
+
+pDigitsWithTimeout =
+    do digits <- many pDigit
+       pSpace
+       to <- (string "(timeout)" >> return True) <|> return False
+       return (digits, to)
+
+pDigit :: CharParser () Digit
+pDigit =
+    (char '#' >> return Pound) <|>
+    (char '*' >> return Star)  <|>
+    (char '0' >> return Zero)  <|>
+    (char '1' >> return One)   <|>
+    (char '2' >> return Two)   <|>
+    (char '3' >> return Three) <|>
+    (char '4' >> return Four)  <|>
+    (char '5' >> return Five)  <|>
+    (char '6' >> return Six)   <|>
+    (char '7' >> return Seven) <|>
+    (char '8' >> return Eight) <|>
+    (char '9' >> return Nine)
+
+pAsciiDigit :: CharParser () Digit
+pAsciiDigit =
+    do ds <- many1 digit
+       case ds of
+         "35" -> return Pound
+         "42" -> return Star
+         "48" -> return Zero
+         "49" -> return One
+         "50" -> return Two
+         "51" -> return Three
+         "52" -> return Four
+         "53" -> return Five
+         "54" -> return Six
+         "55" -> return Seven
+         "56" -> return Eight
+         "57" -> return Nine
+         _    -> pzero <?> "The ascii character code " ++ ds ++
+                 " (" ++ [chr (read ds)] ++
+                 ") does not correspond to a digit on the keypad"
+
+pEndPos :: CharParser () Integer
+pEndPos =
+    do string "endpos="
+       ds <- many1 digit
+       return (read ds)
+
 
 {-
 Usage: ANSWER
@@ -299,73 +376,3 @@ waitForDigit :: (MonadIO m)
 waitForDigit timeout =
     do res <- sendRecv $ "WAIT FOR DIGIT " ++ show timeout
        return $ parseResult p res
-    where
-      p = do pResult
-             (string "-1" >> return Nothing) <|>
-               (string "0" >> return (Just Nothing)) <|>
-               liftM (Just . Just) pAsciiDigit
-
-
--- * Result Parsers
-parseResult p res =
-    case parse p res res of
-      (Left e) -> error (show e) -- throwError (userError (show e))
-      (Right r) -> r
-
--- |parse 0 as True, -1 as failure
-pSuccessFailure :: CharParser () Bool
-pSuccessFailure =
-    (char '0' >> return True) <|> (string "-1" >> return False)
-
--- |parse '200 result='
-pResult :: CharParser () String
-pResult = string "200 result="
-
--- |parse a block of zero or more ' ' and '\t' characters (but not '\n')
-pSpace :: CharParser () String
-pSpace = many (tab <|> char ' ')
-
-pDigitsWithTimeout =
-    do digits <- many pDigit
-       pSpace
-       to <- (string "(timeout)" >> return True) <|> return False
-       return (digits, to)
-
-pDigit :: CharParser () Digit
-pDigit =
-    (char '#' >> return Pound) <|>
-    (char '*' >> return Star)  <|>
-    (char '0' >> return Zero)  <|>
-    (char '1' >> return One)   <|>
-    (char '2' >> return Two)   <|>
-    (char '3' >> return Three) <|>
-    (char '4' >> return Four)  <|>
-    (char '5' >> return Five)  <|>
-    (char '6' >> return Six)   <|>
-    (char '7' >> return Seven) <|>
-    (char '8' >> return Eight) <|>
-    (char '9' >> return Nine)
-
-pAsciiDigit :: CharParser () Digit
-pAsciiDigit =
-    do ds <- many1 digit
-       case ds of
-         "35" -> return Pound
-         "42" -> return Star
-         "48" -> return Zero
-         "49" -> return One
-         "50" -> return Two
-         "51" -> return Three
-         "52" -> return Four
-         "53" -> return Five
-         "54" -> return Six
-         "55" -> return Seven
-         "56" -> return Eight
-         "57" -> return Nine
-         _ -> pzero <?> "The ascii character code " ++ ds ++ " (" ++ [chr (read ds)] ++ ") does not correspond to a digit on the keypad"
-
-pEndPos :: CharParser () Integer
-pEndPos =
-    do string "endpos="
-       ds <- many1 digit
-       return (read ds)
