@@ -1,4 +1,4 @@
-# Froked from
+# Forked from
 
 - web page:     https://hackage.haskell.org/package/AGI
 - repository:   http://src.seereason.com/haskell-agi
