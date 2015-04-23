@@ -1,4 +1,4 @@
-module BasicCall
+module Main
     (main
     )
    where
