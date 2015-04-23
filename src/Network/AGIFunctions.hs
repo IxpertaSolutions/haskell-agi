@@ -21,7 +21,14 @@ import Data.Monoid
 import Data.Char
 import System.IO
 import Text.ParserCombinators.Parsec
-import Text.Parsec.Token
+import Control.Applicative ((*>), (<*>), (<$>))
+
+integer = rd <$> (plus <|> minus <|> number)
+  where
+    rd     = read :: String -> Integer
+    plus   = char '+' *> number
+    minus  = (:) <$> char '-' <*> number
+    number = many1 digit
 
 -- * Result Parsers
 parseResult p res =
@@ -376,3 +383,34 @@ waitForDigit :: (MonadIO m)
 waitForDigit timeout =
     do res <- sendRecv $ "WAIT FOR DIGIT " ++ show timeout
        return $ parseResult p res
+  where
+    p = do pResult
+           (string "-1" >> return Nothing) <|>
+             (string "0" >> return (Just Nothing)) <|>
+             liftM (Just . Just) pAsciiDigit
+
+{-
+Usage: EXEC Dial "IAX2/alice|20"
+
+
+Executes application with given options.
+
+Returns whatever the application returns, or -2 on failure to find application.
+
+Returns:
+failure: 200 result=-2
+success: 200 result=<app_return_code>
+
+<app_return_code> - return code of execute application
+
+-}
+exec :: (MonadIO m) => String -> [String] -> AGIT m (Maybe Integer)
+exec app []   = return Nothing
+exec app args =
+    do res <- sendRecv $ "EXEC \"|" ++ (mconcat $ map (++ "|") args)
+       return $ parseResult p res
+  where
+    p = do pResult
+           (string "-2" >> return Nothing) <|>
+             (do retVal <- integer
+                 return $ Just retVal)
