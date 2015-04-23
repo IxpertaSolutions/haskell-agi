@@ -30,6 +30,6 @@ mainAGI :: HostName -> PortNumber -> AGI ()
 mainAGI _ _= do
     answer
     var <- liftM agiVars ask
-    exec "DIAL" ["SIP" ++ fromMaybe "Error" (lookup "agi_extension" var)]
+    exec "DIAL" ["SIP/" ++ fromMaybe "Error" (lookup "agi_extension" var)]
     hangUp Nothing
     return ()
