@@ -22,6 +22,7 @@ import Control.Monad.Reader
 import Control.Monad.Error
 import Data.Monoid
 import Data.Char
+import Data.List
 import System.IO
 import Text.ParserCombinators.Parsec
 import Control.Applicative ((*>), (<*>), (<$>))
@@ -411,16 +412,13 @@ success: 200 result=<app_return_code>
 exec :: (MonadIO m) => String -> [String] -> AGIT m (Maybe Integer)
 exec app []   = return Nothing
 exec app args =
-    do res <- sendRecv $ "EXEC " ++ app ++ "\"" ++ params ++ "\""
+    do res <- sendRecv $ "EXEC " ++ app ++ "\"" ++ intercalate "," args ++ "\""
        return $ parseResult p res
   where
     p = do pResult
            (string "-2" >> return Nothing) <|>
              (do retVal <- integer
                  return $ Just retVal)
-    params = case args of
-                [arg] -> arg
-                args  -> mconcat $ map (++ ",") args
 
 
 {-
