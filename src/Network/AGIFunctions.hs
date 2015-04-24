@@ -421,3 +421,32 @@ exec app args =
     params = case args of
                 [arg] -> arg
                 args  -> mconcat $ map (++ ",") args
+
+
+{-
+Usage: EXEC Dial "IAX2/alice,20"
+
+In some documentations is: EXEC Dial "IAX2/alice|20" which is wrong! Asterisk
+it self asks for coma separation.
+
+
+Executes application with given options.
+
+Returns whatever the application returns, or -2 on failure to find application.
+
+Returns:
+failure: 200 result=-2
+success: 200 result=<app_return_code>
+
+<app_return_code> - return code of execute application
+
+-}
+-- !!!!!!!!!!!! Change Int into CallerID or something like this
+setCallerID :: (MonadIO m) => Int -> AGIT m Bool
+setCallerID newCallerID = do
+    res <- sendRecv $ "SET CALLERID " ++ show newCallerID
+    return $ parseResult p res
+  where
+    p = do pResult
+           (string "1" >> return True) <|>
+             (digit >> return False)
