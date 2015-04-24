@@ -1,13 +1,15 @@
 module Network.AGIFunctions
     ( answer
-    , hangUp
+    , exec
     , getData
+    , hangUp
+    , record
     , sayDigits
     , sayNumber
+    , setMusicOnHold
+    , setVariable
     , streamFile
-    , record
     , waitForDigit
-    , exec
     )
   where
 
@@ -399,8 +401,6 @@ it self asks for coma separation.
 
 Executes application with given options.
 
-Returns whatever the application returns, or -2 on failure to find application.
-
 Returns:
 failure: 200 result=-2
 success: 200 result=<app_return_code>
@@ -424,21 +424,13 @@ exec app args =
 
 
 {-
-Usage: EXEC Dial "IAX2/alice,20"
+Usage: SET CALLERID 12345
 
-In some documentations is: EXEC Dial "IAX2/alice|20" which is wrong! Asterisk
-it self asks for coma separation.
+This function never fails.
 
-
-Executes application with given options.
-
-Returns whatever the application returns, or -2 on failure to find application.
 
 Returns:
-failure: 200 result=-2
-success: 200 result=<app_return_code>
-
-<app_return_code> - return code of execute application
+success: 200 result=1
 
 -}
 -- !!!!!!!!!!!! Change Int into CallerID or something like this
@@ -449,4 +441,47 @@ setCallerID newCallerID = do
   where
     p = do pResult
            (string "1" >> return True) <|>
+             (digit >> return False)
+
+
+{-
+Usage: SET VARIABLE foo bar
+
+This function never fails.
+
+
+Returns:
+success: 200 result=1
+
+-}
+setVariable :: (MonadIO m) => VariableName -> Variable -> AGIT m Bool
+setVariable varName var = do
+    res <- sendRecv $ "SET VARIABLE " ++ varName ++ " " ++ var
+    return $ parseResult p res
+  where
+    p = do pResult
+           (string "1" >> return True) <|>
+             (digit >> return False)
+
+{-
+Usage: SET VARIABLE VARIABLENAME VALUE
+
+This function never fails.
+
+
+Returns:
+success: 200 result=0
+
+-}
+setMusicOnHold :: (MonadIO m) => OnOff -> MusicOnHoldClass -> AGIT m Bool
+setMusicOnHold onOff musicClass = do
+    res <- sendRecv $ "SET MUSIC " ++ musicClass ++ " " ++ onOffStr
+    return $ parseResult p res
+  where
+    onOffStr =
+        case onOff of
+            On ->  "ON"
+            Off -> "OFF"
+    p = do pResult
+           (string "0" >> return True) <|>
              (digit >> return False)

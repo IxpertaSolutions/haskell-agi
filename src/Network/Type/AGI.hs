@@ -5,9 +5,13 @@ module Network.Type.AGI
     , AGIT(..)
     , Command
     , Digit(..)
+    , MusicOnHoldClass
+    , OnOff(..)
     , ppDigit
     , RecordResult(..)
     , SoundType(..)
+    , Variable
+    , VariableName
     ) where
 
 import Control.Monad
@@ -80,3 +84,9 @@ data RecordResult
     | RandomError String
       deriving (Eq, Show, Data, Typeable)
 
+type Variable     = String
+type VariableName = String
+
+data OnOff = On | Off
+
+type MusicOnHoldClass = String
