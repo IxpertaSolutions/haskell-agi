@@ -485,3 +485,24 @@ setMusicOnHold onOff musicClass = do
     p = do pResult
            (string "0" >> return True) <|>
              (digit >> return False)
+
+{-
+GET VARIABLE UNIQUEID
+ANSWER:
+200 result=1 (1187188485.0)
+
+Returns:
+failure or not set: 200 result=0
+success: 200 result=1 <value>
+-}
+getVariable :: (MonadIO m) => VariableName -> AGIT m (Maybe Variable)
+getVariable variableName = do
+    res <- sendRecv $ "GET VARIABLE " ++ variableName
+    return $ parseResult p res
+  where
+    p = do pResult
+           (string "0" >> return Nothing) <|> pVariable
+    pVariable = do
+        string "1 ("
+        var <- many $ noneOf ")"
+        return $ Just var
