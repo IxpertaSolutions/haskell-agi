@@ -42,6 +42,7 @@ library
             Network.AGI
             Network.Type.AGI
             Network.AGIFunctions
+            Network.AGIEnvironment
 
     -- For more complex build options see:
     -- http://www.haskell.org/ghc/docs/latest/html/Cabal/
