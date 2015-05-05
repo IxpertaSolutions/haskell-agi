@@ -19,8 +19,8 @@ import Network
 -- 3rd Party Modules
 
 import Network.AGI
-import Network.Type.AGI
-import Network.AGIFunctions
+import Network.AGI.Type
+import Network.AGI.Functions
 
 main :: IO ()
 main =

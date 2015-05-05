@@ -1,4 +1,4 @@
-module Network.AGIFunctions
+module Network.AGI.Functions
     ( answer
     , exec
     , getData
@@ -13,7 +13,7 @@ module Network.AGIFunctions
     )
   where
 
-import Network.Type.AGI
+import Network.AGI.Type
 import Network.AGI
 
 import Control.Monad

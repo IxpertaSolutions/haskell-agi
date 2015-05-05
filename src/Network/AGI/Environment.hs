@@ -1,4 +1,4 @@
-module Network.AGIEnvironment
+module Network.AGI.Environment
     ( envGetRequest
     , envGetChannel
     , envGetLanguage
@@ -23,7 +23,7 @@ module Network.AGIEnvironment
     )
   where
 
-import Network.Type.AGI
+import Network.AGI.Type
 import Network.AGI
 
 import Control.Monad.Trans

@@ -7,7 +7,7 @@ module Network.AGI
     , ppEscapeDigits
     ) where
 
-import Network.Type.AGI
+import Network.AGI.Type
 
 import Control.Concurrent
 import Control.Exception (finally)

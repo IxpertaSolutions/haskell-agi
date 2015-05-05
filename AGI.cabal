@@ -40,9 +40,9 @@ library
 
     Exposed-modules:
             Network.AGI
-            Network.Type.AGI
-            Network.AGIFunctions
-            Network.AGIEnvironment
+            Network.AGI.Type
+            Network.AGI.Functions
+            Network.AGI.Environment
 
     -- For more complex build options see:
     -- http://www.haskell.org/ghc/docs/latest/html/Cabal/

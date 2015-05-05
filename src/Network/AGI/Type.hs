@@ -1,5 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving, DeriveDataTypeable #-}
-module Network.Type.AGI
+module Network.AGI.Type
     ( AGI
     , AGIEnv(..)
     , AGIT(..)
