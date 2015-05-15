@@ -18,7 +18,7 @@ module Network.AGI.Environment
     , languageCode
     , originatingChannelType
     , callUniqueID
-    , asterisVersion
+    , asteriskVersion
     , callerIDNumber
     , callerIDName
     , zapCallingPres
@@ -84,8 +84,8 @@ callUniqueID = do
     var <- liftM agiVars ask
     return $ fromJust $ lookup "agi_uniqueid" var
 
-asterisVersion :: (MonadIO m) => AGIT m String
-asterisVersion = do
+asteriskVersion :: (MonadIO m) => AGIT m String
+asteriskVersion = do
     var <- liftM agiVars ask
     return $ fromJust $ lookup "agi_version" var
 
