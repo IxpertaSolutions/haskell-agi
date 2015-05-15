@@ -109,7 +109,7 @@ callerIDName = do
     return $ fromJust $ lookup "agi_calleridname" var
 
 -- | The presentation for the caller ID in a ZAP channel.
--- @Probably only for ZAP channel.
+-- Probably only for ZAP channel.
 zapCallingPres :: (MonadIO m) => AGIT m (Maybe String)
 zapCallingPres = do
     var <- liftM agiVars ask
