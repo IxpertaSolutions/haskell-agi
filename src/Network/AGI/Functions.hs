@@ -29,7 +29,7 @@ import Control.Applicative ((*>), (<*>), (<$>))
 
 integer = rd <$> (plus <|> minus <|> number)
   where
-    rd     = read :: String -> Integer
+    rd     = read :: String -> Int
     plus   = char '+' *> number
     minus  = (:) <$> char '-' <*> number
     number = many1 digit
@@ -409,10 +409,10 @@ success: 200 result=<app_return_code>
 <app_return_code> - return code of execute application
 
 -}
-exec :: (MonadIO m) => String -> [String] -> AGIT m (Maybe Integer)
+exec :: (MonadIO m) => String -> [String] -> AGIT m (Maybe Int)
 exec app []   = return Nothing
 exec app args =
-    do res <- sendRecv $ "EXEC " ++ app ++ "\"" ++ intercalate "," args ++ "\""
+    do res <- sendRecv $ "EXEC " ++ app ++ " \"" ++ intercalate "," args ++ "\""
        return $ parseResult p res
   where
     p = do pResult
