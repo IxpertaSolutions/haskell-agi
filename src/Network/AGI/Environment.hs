@@ -35,6 +35,8 @@ module Network.AGI.Environment
     , accountCode
     , threadID
     , arg
+    , lookupVar
+    , getVarWith
     )
   where
 
