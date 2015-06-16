@@ -1,18 +1,18 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Main
-    (main
+    (
+      main
     )
    where
 
 -- Standard Haskell Modules
-
-import           Control.Monad
-import           Control.Monad.Reader
 import           Data.Maybe
+import           Data.Monoid
 import           Network
 
 -- 3rd Party Modules
-
 import           Network.AGI
+import           Network.AGI.Environment
 import           Network.AGI.Functions
 import           Network.AGI.Type
 
@@ -23,7 +23,7 @@ main =
 mainAGI :: HostName -> PortNumber -> AGI ()
 mainAGI _  _ = do
     answer
-    var <- liftM agiVars ask
-    exec "DIAL" ["SIP/" ++ fromMaybe "Error" (lookup "agi_extension" var)]
+    ext <- lookupVar "agi_extension"
+    exec "DIAL" ["SIP/" <>  fromMaybe "Error" ext]
     hangUp Nothing
     return ()
