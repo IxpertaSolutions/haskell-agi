@@ -4,12 +4,14 @@ module Network.AGI.Functions
     ( answer
     , exec
     , getData
+    , getVariable
     , hangUp
     , record
     , sayDigits
     , sayNumber
     , setMusicOnHold
     , setVariable
+    , setCallerID
     , streamFile
     , waitForDigit
     )
@@ -24,14 +26,13 @@ import           Control.Monad.Error
 import           Data.Char
 import           Data.Foldable       (asum)
 import           Data.Functor        ((<$))
-import           Data.List
 import           Data.Monoid
 import           Data.Text           (Text)
 import qualified Data.Text           as T
 import           Text.Parsec
-import           Text.Parsec.Prim    (parserZero)
 import           Text.Parsec.Text    as T
 
+integer :: T.Parser Int
 integer = rd <$> (plus <|> minus <|> number)
   where
     rd     = read :: String -> Int
@@ -64,11 +65,10 @@ pSpace :: T.Parser Text
 pSpace = liftM T.pack $ many (tab <|> char ' ')
 
 pDigitsWithTimeout :: T.Parser ([Digit], Bool)
-pDigitsWithTimeout = do
-    digits <- many pDigit
-    pSpace
-    to <- True <$ string "(timeout)"<|> return False
-    return (digits, to)
+pDigitsWithTimeout = (,)
+    <$> many pDigit
+    <*  pSpace
+    <*> (True <$ string "(timeout)" <|> return False)
 
 pDigit :: T.Parser Digit
 pDigit =
@@ -111,10 +111,9 @@ pAsciiDigit = do
                 ]
 
 pEndPos :: T.Parser Integer
-pEndPos = do
-    string "endpos="
-    read <$> many1 digit
-
+pEndPos = read
+    <$  string "endpos="
+    <*> many1 digit
 
 pMaybeDigit :: T.Parser (Maybe (Maybe Digit))
 pMaybeDigit = pResult >> asum
@@ -158,11 +157,6 @@ hangUp mChannel = liftM (parseResult pPositiveOne) (sendRecv $ hangup mChannel)
 
     hangup :: Maybe Text -> Text
     hangup = mappend "HANGUP" . maybe "" (T.cons ' ')
-
-
-  --  do
-  --   res <- sendRecv ("HANGUP" <> maybe "" (T.cons ' ') mChannel)
-  --   return $ parseResult (pResult >> (True <$ char '1'<|> False <$ string "-1")) res
 
 {-
 Usage: GET DATA <file to be streamed> [timeout] [max digits]
@@ -286,7 +280,7 @@ record fp soundType escapeDigits len offset beep silence =
 
       pRandomError :: T.Parser (RecordResult, Integer)
       pRandomError = (,) . RandomError . T.pack
-          <$> manyTill anyChar $ try $ string " (randomerror)"
+          <$> manyTill anyChar (try $ string " (randomerror)")
           <*  pSpace
           <*> pEndPos
 
@@ -415,7 +409,7 @@ streamFile filePath escapeDigits mSampleOffset = liftM (parseResult p) fStream
     pSuccess = string "0" >> pSpace >> fmap (\ep -> Right (Nothing, ep)) pEndPos
 
     pSuccessWithDigit  :: T.Parser (Either Integer (Maybe Digit, Integer))
-    pSuccessWithDigit = (\digit int -> Right (Just digit, int))
+    pSuccessWithDigit = (\dig int -> Right (Just dig, int))
         <$> pAsciiDigit
         <*  pSpace
         <*> pEndPos
@@ -463,7 +457,7 @@ success: 200 result=<app_return_code>
 
 -}
 exec :: (MonadIO m) => Text -> [Text] -> AGIT m (Maybe Int)
-exec app []   = return Nothing
+exec _   []   = return Nothing
 exec app args = liftM (parseResult pReturnCode) exec'
   where
     exec' :: (MonadIO m) => AGIT m Text
@@ -474,7 +468,7 @@ exec app args = liftM (parseResult pReturnCode) exec'
         ]
 
     pReturnCode :: T.Parser (Maybe Int)
-    pReturnCode = pResult >> (Nothing <$ string "-2" <|> liftM Just integer)
+    pReturnCode = pResult >> ((Nothing <$ string "-2") <|> liftM Just integer)
 
 {-
 Usage: SET CALLERID 12345
@@ -553,6 +547,6 @@ getVariable = liftM (parseResult pMaybeVar) . setVar
     pZero = Nothing <$ string "0"
 
     pVariable :: T.Parser (Maybe Variable)
-    pVariable = liftM (Just . T.pack) $ do
-        string "1 ("
-        many $ noneOf ")"
+    pVariable = (Just . T.pack)
+        <$  string "1 ("
+        <*> many (noneOf ")")
