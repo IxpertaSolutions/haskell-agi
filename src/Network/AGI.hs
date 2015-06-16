@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Network.AGI
     ( digitsToInteger
     , run
@@ -7,26 +8,33 @@ module Network.AGI
     , ppEscapeDigits
     ) where
 
-import Network.AGI.Type
+import           Network.AGI.Type
 
-import Control.Concurrent
-import Control.Exception (finally)
-import Control.Monad.Reader
-import Control.Monad
-import Data.Char
-import Data.Maybe
-import Data.Word
-import Network
-import Text.ParserCombinators.Parsec
-import System.IO
-import System.Posix.Signals
-import System.Random
+import           Control.Concurrent
+import           Control.Exception      (finally)
+import           Control.Monad
+import           Control.Monad.Reader
+import           Data.Map               (Map)
+import qualified Data.Map               as M
+import           Data.Maybe
+import           Data.Monoid
+import           Data.Text              (Text)
+import qualified Data.Text              as T
+import qualified Data.Text.IO           as TIO
+import qualified Data.Text.Lazy         as LazyText
+import           Data.Text.Lazy.Builder
+import           Network
+import           System.IO
+import           System.Posix.Signals
 
 
 -- |convert a list of 'Digit's into a quoted string.
 -- The quoted string format is used by many AGI commands
-ppEscapeDigits :: [Digit] -> String
-ppEscapeDigits digits = '"' : (map ppDigit digits  ++ "\"")
+ppEscapeDigits :: [Digit] -> Text
+ppEscapeDigits digits = LazyText.toStrict $ toLazyText $
+  singleton '"'
+  <> fromString (map ppDigit digits)
+  <> singleton '"'
 
 -- |convert a list of 'Digit's to an 'Integer'.
 -- Will fail if the list is empty or contains * or #
@@ -84,29 +92,22 @@ runInternal agi inh outh =
        liftIO $ hSetBuffering outh LineBuffering
        runReaderT (runAGIT agi) (AGIEnv vars inh outh)
 
-readAgiVars :: Handle -> IO [(String, String)]
-readAgiVars inh =
-    do mAgiVar <- readAgiVar
-       case mAgiVar of
-	    Nothing ->
-		return []
-	    Just agiVar ->
-		do rest <- readAgiVars inh
-		   return (agiVar:rest)
-    where readAgiVar :: IO (Maybe (String, String))
-	  readAgiVar =
-	      do l <- hGetLine inh
-		 case l of
-		      "" -> return Nothing
-		      _ -> let (a,v) = break (':' ==) l in
-				       return (Just (a, dropWhile (' ' ==) (tail v)))
+readAgiVars :: Handle -> IO (Map Text Text)
+readAgiVars h = readAgiVars' M.empty
+  where
+    readAgiVars' :: Map Text Text -> IO (Map Text Text)
+    readAgiVars' m = TIO.hGetLine h >>= \l ->
+      return $ case l of
+        "" -> m
+        _  -> let (k,v) = T.break (':'==) l
+              in M.insert k v m
 
 -- |send an AGI Command, and return the Response
 --
 -- this function provides the low-level send/receive functionality.
-sendRecv :: (MonadIO m) => Command -> AGIT m String
+sendRecv :: (MonadIO m) => Command -> AGIT m Text
 sendRecv cmd =
     do inh  <- liftM agiInH ask
        outh <- liftM agiOutH ask
-       liftIO $ do hPutStrLn inh cmd
-                   hGetLine outh
+       liftIO $ do TIO.hPutStrLn inh cmd
+                   TIO.hGetLine outh

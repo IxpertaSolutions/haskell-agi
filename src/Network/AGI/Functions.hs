@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections     #-}
 module Network.AGI.Functions
     ( answer
     , exec
@@ -13,19 +15,22 @@ module Network.AGI.Functions
     )
   where
 
-import Network.AGI.Type
-import Network.AGI
+import           Network.AGI
+import           Network.AGI.Type
 
-import Control.Monad
-import Control.Monad.Trans
-import Control.Monad.Reader
-import Control.Monad.Error
-import Data.Monoid
-import Data.Char
-import Data.List
-import System.IO
-import Text.ParserCombinators.Parsec
-import Control.Applicative ((*>), (<*>), (<$>))
+import           Control.Applicative ((*>), (<$>), (<*), (<*>))
+import           Control.Monad
+import           Control.Monad.Error
+import           Data.Char
+import           Data.Foldable       (asum)
+import           Data.Functor        ((<$))
+import           Data.List
+import           Data.Monoid
+import           Data.Text           (Text)
+import qualified Data.Text           as T
+import           Text.Parsec
+import           Text.Parsec.Prim    (parserZero)
+import           Text.Parsec.Text    as T
 
 integer = rd <$> (plus <|> minus <|> number)
   where
@@ -35,71 +40,89 @@ integer = rd <$> (plus <|> minus <|> number)
     number = many1 digit
 
 -- * Result Parsers
+parseResult :: T.Parser a -> Text -> a
 parseResult p res =
-    case parse p res res of
-      (Left e) -> error (show e) -- throwError (userError (show e))
-      (Right r) -> r
+    case parse p (T.unpack res) res of
+      Left e -> error (show e) -- throwError (userError (show e))
+      Right r -> r
 
 -- |parse 0 as True, -1 as failure
-pSuccessFailure :: CharParser () Bool
-pSuccessFailure =
-    (char '0' >> return True) <|> (string "-1" >> return False)
+pSuccessFailure :: T.Parser Bool
+pSuccessFailure = True <$ char '0' <|> False <$ string "-1"
 
 -- |parse '200 result='
-pResult :: CharParser () String
-pResult = string "200 result="
+pResult :: T.Parser Text
+pResult = liftM T.pack $ string "200 result="
+
+-- | parses value of result as bool
+-- | 1 as True, any other digit as False
+pBoolResult :: T.Parser Bool
+pBoolResult = pResult >> ((True <$ string "1") <|> (False <$ digit))
 
 -- |parse a block of zero or more ' ' and '\t' characters (but not '\n')
-pSpace :: CharParser () String
-pSpace = many (tab <|> char ' ')
+pSpace :: T.Parser Text
+pSpace = liftM T.pack $ many (tab <|> char ' ')
 
-pDigitsWithTimeout =
-    do digits <- many pDigit
-       pSpace
-       to <- (string "(timeout)" >> return True) <|> return False
-       return (digits, to)
+pDigitsWithTimeout :: T.Parser ([Digit], Bool)
+pDigitsWithTimeout = do
+    digits <- many pDigit
+    pSpace
+    to <- True <$ string "(timeout)"<|> return False
+    return (digits, to)
 
-pDigit :: CharParser () Digit
+pDigit :: T.Parser Digit
 pDigit =
-    (char '#' >> return Pound) <|>
-    (char '*' >> return Star)  <|>
-    (char '0' >> return Zero)  <|>
-    (char '1' >> return One)   <|>
-    (char '2' >> return Two)   <|>
-    (char '3' >> return Three) <|>
-    (char '4' >> return Four)  <|>
-    (char '5' >> return Five)  <|>
-    (char '6' >> return Six)   <|>
-    (char '7' >> return Seven) <|>
-    (char '8' >> return Eight) <|>
-    (char '9' >> return Nine)
+    asum [
+        Pound <$ char '#',
+        Star <$ char '*',
+        Zero <$ char '0',
+        One <$ char '1',
+        Two <$ char '2',
+        Three <$ char '3',
+        Four <$ char '4',
+        Five <$ char '5',
+        Six <$ char '6',
+        Seven <$ char '7',
+        Eight <$ char '8',
+        Nine <$ char '9'
+    ]
 
-pAsciiDigit :: CharParser () Digit
-pAsciiDigit =
-    do ds <- many1 digit
-       case ds of
-         "35" -> return Pound
-         "42" -> return Star
-         "48" -> return Zero
-         "49" -> return One
-         "50" -> return Two
-         "51" -> return Three
-         "52" -> return Four
-         "53" -> return Five
-         "54" -> return Six
-         "55" -> return Seven
-         "56" -> return Eight
-         "57" -> return Nine
-         _    -> pzero <?> "The ascii character code " ++ ds ++
-                 " (" ++ [chr (read ds)] ++
-                 ") does not correspond to a digit on the keypad"
+pAsciiDigit :: T.Parser Digit
+pAsciiDigit = do
+    ds <- many1 digit
+    case ds of
+        "35" -> return Pound
+        "42" -> return Star
+        "48" -> return Zero
+        "49" -> return One
+        "50" -> return Two
+        "51" -> return Three
+        "52" -> return Four
+        "53" -> return Five
+        "54" -> return Six
+        "55" -> return Seven
+        "56" -> return Eight
+        "57" -> return Nine
+        _    -> parserZero <?> concat
+                [
+                  "The ascii character code ", ds,
+                  " (",[chr $ read ds],") ",
+                  "does not correspond to a digit on the keypad"
+                ]
 
-pEndPos :: CharParser () Integer
-pEndPos =
-    do string "endpos="
-       ds <- many1 digit
-       return (read ds)
+pEndPos :: T.Parser Integer
+pEndPos = do
+    string "endpos="
+    read <$> many1 digit
 
+
+pMaybeDigit :: T.Parser (Maybe (Maybe Digit))
+pMaybeDigit = pResult >> asum
+    [
+        Nothing <$ string "-1",
+        Just Nothing <$ string "0",
+        liftM (Just . Just) pAsciiDigit
+    ]
 
 {-
 Usage: ANSWER
@@ -112,9 +135,7 @@ success: 200 result=0
 -}
 -- |'answer' channel if not already in answer state
 answer :: (MonadIO m) => AGIT m Bool -- ^ True on success, False on failure
-answer =
-    do res <- sendRecv "ANSWER"
-       return $ parseResult (pResult >> pSuccessFailure) res
+answer = liftM (parseResult (pResult >> pSuccessFailure)) $ sendRecv "ANSWER"
 {-
  Usage: HANGUP [<channelname>]
 
@@ -128,11 +149,20 @@ success: 200 result=1
 -}
 -- |hangUp the specified channel
 hangUp :: (MonadIO m)
-       => Maybe String -- ^ channel to hangup, or current channel if not specified
+       => Maybe Text -- ^ channel to hangup, or current channel if not specified
        -> AGIT m Bool
-hangUp mChannel =
-    do res <- sendRecv ("HANGUP" ++ maybe "" (' ' :) mChannel)
-       return $ parseResult (pResult >> ((char '1' >> return True) <|> (string "-1" >> return False))) res
+hangUp mChannel = liftM (parseResult pPositiveOne) (sendRecv $ hangup mChannel)
+  where
+    pPositiveOne :: T.Parser Bool
+    pPositiveOne = pResult >> (True <$ char '1' <|> False <$ string "-1")
+
+    hangup :: Maybe Text -> Text
+    hangup = mappend "HANGUP" . maybe "" (T.cons ' ')
+
+
+  --  do
+  --   res <- sendRecv ("HANGUP" <> maybe "" (T.cons ' ') mChannel)
+  --   return $ parseResult (pResult >> (True <$ char '1'<|> False <$ string "-1")) res
 
 {-
 Usage: GET DATA <file to be streamed> [timeout] [max digits]
@@ -152,25 +182,31 @@ success: 200 result=<digits>
 -- See also: 'streamFile'
 getData :: (MonadIO m)
         => FilePath -- ^ file to stream
-        -> Maybe Integer -- ^ timout in ms after keypress (default: 2000 ms)
+        -> Maybe Integer -- ^ timeout in ms after keypress (default: 2000 ms)
         -> Maybe Integer -- ^ max
         -> AGIT m (Maybe ([Digit], Bool)) -- ^ Nothing on failure, Just (digits, timeout) on success
-getData fp mTimeout mMaxDigits =
-    let cmd =
-	    "GET DATA " ++ fp ++
-                        case (mTimeout, mMaxDigits) of
-                          (Nothing, Nothing) -> ""
-                          (Just timeout, Nothing) ->  show timeout
-                          (Nothing, Just maxDigits) -> " 2000 " ++ show maxDigits
-                          (Just timeout, Just maxDigits) -> " " ++ show timeout ++" "++ show maxDigits
+getData fp mTimeout mMaxDigits = liftM (parseResult p) getData'
+  where
+    getData' :: (MonadIO m) => AGIT m Text
+    getData' = sendRecv $ T.concat
+        [
+            "GET DATA ", T.pack fp, params mTimeout mMaxDigits
+        ]
 
-    in
-      do res <- sendRecv cmd
-         return $ parseResult p res
-             where
-               p = do pResult
-                      (try pFail >> return Nothing) <|> liftM Just pDigitsWithTimeout
-               pFail = string "-1"
+    params :: Maybe Integer -> Maybe Integer -> Text
+    params Nothing Nothing = ""
+    params (Just t) Nothing = T.pack $ show t
+    params Nothing (Just md) = " 2000 " <> T.pack (show md)
+    params (Just t) (Just md) = T.concat
+        [
+            " ", T.pack $ show t,
+            " ", T.pack $ show md
+        ]
+
+    p :: T.Parser (Maybe ([Digit], Bool))
+    p = pResult >>
+        ((Nothing <$ try (string "-1")) <|> liftM Just pDigitsWithTimeout)
+
 {-
 Usage: RECORD FILE <filename> <format> <escape digits> <timeout> [offset samples] [BEEP] [s=<silence>]
 
@@ -197,46 +233,62 @@ record :: (MonadIO m)
        -> Bool -- ^ beep to indicate recording has begun
        -> Maybe Integer -- ^ stop recording if this many seconds of silence passes
        -> AGIT m (RecordResult, Integer) -- ^ exit condition, endpos=offset
-record fp soundType escapeDigits length offset beep silence =
-    do res <- sendRecv $ "RECORD FILE " ++ fp ++ " " ++ show soundType ++ " " ++
-                          ppEscapeDigits escapeDigits ++ " " ++
-                          maybe "-1" show length ++
-                          maybe "" (\o -> ' ': show o) offset ++
-                          (if beep then " beep" else "") ++
-                          maybe "" (\s -> " s=" ++ show s) silence
+record fp soundType escapeDigits len offset beep silence =
+    do res <- sendRecv $ T.concat ["RECORD FILE ", T.pack fp, " ", T.pack $ show soundType, " ",
+                          ppEscapeDigits escapeDigits, " ",
+                          maybe "-1" (T.pack . show) len,
+                          maybe "" (T.cons ' ' . T.pack . show) offset,
+                          if beep then " beep" else "",
+                          maybe "" (T.append " s=" . T.pack . show)  silence
+                          ]
        return $ parseResult p res
 
-p = pResult >> (pFailureToWrite <|> pFailureOnWaitFor <|> pHangUp <|> pInterrupted <|> pTimeout <|> pRandomError)
     where
-      pFailureToWrite =
-          try (string "-1 (writefile)") >> return (FailureToWrite, 0)
-      pFailureOnWaitFor =
-          do try (string "-1 (waitfor)")
-             pSpace
-             ep <- pEndPos
-             return (FailureOnWaitFor, ep)
-      pHangUp =
-          do try (string "0 (hangup)" <|> string "-1 (hangup)")
-             pSpace
-             ep <- pEndPos
-             return (HangUp, ep)
-      pInterrupted = try $
-          do digit <- pAsciiDigit
-             pSpace
-             string "(dtmf)"
-             pSpace
-             ep <- pEndPos
-             return (Interrupted digit, ep)
-      pTimeout =
-          do try (string "0 (timeout)")
-             pSpace
-             ep <- pEndPos
-             return (Timeout, ep)
-      pRandomError = try $
-          do error <- manyTill anyChar (try (string " (randomerror)"))
-             pSpace
-             ep <- pEndPos
-             return (RandomError error, ep)
+      p :: T.Parser (RecordResult, Integer)
+      p = pResult >> asum
+          [
+              try pFailureToWrite,
+              try pFailureOnWaitFor,
+              try pHangUp,
+              try pInterrupted,
+              try pTimeout,
+              try pRandomError
+          ]
+
+      pFailureToWrite :: T.Parser (RecordResult, Integer)
+      pFailureToWrite = (FailureToWrite, 0) <$ string "-1 (writefile)"
+
+      pFailureOnWaitFor :: T.Parser (RecordResult, Integer)
+      pFailureOnWaitFor = (FailureOnWaitFor,)
+          <$  string "-1 (waitfor)"
+          <*  pSpace
+          <*> pEndPos
+
+      pHangUp :: T.Parser (RecordResult, Integer)
+      pHangUp = (HangUp,)
+          <$ (string "0 (hangup)" <|> string "-1 (hangup)")
+          <* pSpace
+          <*> pEndPos
+
+      pInterrupted :: T.Parser (RecordResult, Integer)
+      pInterrupted = (,) . Interrupted
+          <$> pAsciiDigit
+          <*  pSpace
+          <*  string "(dtmf)"
+          <*  pSpace
+          <*> pEndPos
+
+      pTimeout :: T.Parser (RecordResult, Integer)
+      pTimeout = (Timeout,)
+          <$ try (string "0 (timeout)")
+          <*  pSpace
+          <*> pEndPos
+
+      pRandomError :: T.Parser (RecordResult, Integer)
+      pRandomError = (,) . RandomError . T.pack
+          <$> manyTill anyChar $ try $ string " (randomerror)"
+          <*  pSpace
+          <*> pEndPos
 
 {-
  Usage: SAY DIGITS <number> <escape digits>
@@ -263,14 +315,15 @@ sayDigits :: (MonadIO m)
           => [Digit] -- ^ digits to say
           -> [Digit] -- ^ digits which can stop playback
           -> AGIT m (Maybe (Maybe Digit)) -- ^ Nothing on error, Just Nothing on success. Just (Just <digit>) if interrupted.
-sayDigits digits escapeDigits =
-    do res <- sendRecv $ "SAY DIGITS " ++ map ppDigit digits ++ " " ++ ppEscapeDigits escapeDigits
-       return $ parseResult p res
+sayDigits digits escapeDigits = liftM (parseResult pMaybeDigit) sayDigits'
     where
-      p = do pResult
-             (string "-1" >> return Nothing) <|>
-               (string "0" >> return (Just Nothing)) <|>
-               liftM (Just . Just) pAsciiDigit
+      sayDigits' :: (MonadIO m) => AGIT m Text
+      sayDigits' = sendRecv $ T.concat
+          [
+              "SAY DIGITS ",
+              T.pack $ map ppDigit digits, " ",
+              ppEscapeDigits escapeDigits
+          ]
 
 {-
 SAY NUMBER <number> <escape digits>
@@ -295,14 +348,15 @@ sayNumber :: (MonadIO m)
           => Integer -- ^ number to say
           -> [Digit] -- ^ return early if any of these digits are received
           -> AGIT m (Maybe (Maybe Digit)) -- ^ Nothing on failure, Just Nothing on success, Just (Just <digit>) if key is pressed
-sayNumber number escapeDigits =
-    do res <- sendRecv ("SAY NUMBER " ++ show number ++ " " ++ ppEscapeDigits escapeDigits)
-       return $ parseResult p res
-    where
-      p = do pResult
-             (string "-1" >> return Nothing) <|>
-              (string "0" >> return (Just Nothing)) <|>
-              liftM (Just . Just) pAsciiDigit
+sayNumber number escapeDigits = liftM (parseResult pMaybeDigit) sayNumber'
+  where
+    sayNumber' :: (MonadIO m) => AGIT m Text
+    sayNumber' = sendRecv $ T.concat
+        [
+            "SAY NUMBER ",
+            T.pack $ show number, " ",
+            ppEscapeDigits escapeDigits
+        ]
 
 {-
 Usage: STREAM FILE <filename> <escape digits> [sample offset]
@@ -337,31 +391,34 @@ streamFile :: (MonadIO m)
            -> [Digit] -- ^ escape digits
            -> Maybe Integer -- ^ sample offset
            -> AGIT m (Either Integer (Maybe Digit, Integer)) -- ^ On failure: Left <endpos>. On success: Right (Maybe Digit, <endpos>)
-streamFile filePath escapeDigits mSampleOffset =
-    do res <- sendRecv $ "STREAM FILE " ++ filePath ++ " " ++ ppEscapeDigits escapeDigits ++ maybe "" (\so -> ' ' :  show so) mSampleOffset
-       return $ parseResult p res
-    where
-      p =
-          do pResult
-             pFailure <|> pFailureOnOpen <|> pSuccess <|> pSuccessWithDigit
-      pFailure =
-          do string "-1"
-             pSpace
-             ep <- pEndPos
-             return (Left ep)
-      pFailureOnOpen = try $
-          do string "0 endpos=0"
-             return (Left 0)
-      pSuccess = try $
-          do string "0"
-             pSpace
-             ep <- pEndPos
-             return (Right (Nothing, ep))
-      pSuccessWithDigit = try $
-          do d <- pAsciiDigit
-             pSpace
-             ep <- pEndPos
-             return (Right (Just d, ep))
+streamFile filePath escapeDigits mSampleOffset = liftM (parseResult p) fStream
+  where
+    fStream :: (MonadIO m) => AGIT m Text
+    fStream = sendRecv $ T.concat
+        [
+            "STREAM FILE ",
+            T.pack filePath, " ", ppEscapeDigits escapeDigits,
+            maybe "" (T.cons ' ' . T.pack . show)  mSampleOffset
+        ]
+
+    p :: T.Parser (Either Integer (Maybe Digit, Integer))
+    p = pResult >> asum
+        [pFailure, try pFailureOnOpen, try pSuccess, try pSuccessWithDigit]
+
+    pFailure  :: T.Parser (Either Integer (Maybe Digit, Integer))
+    pFailure = string "-1" >> pSpace >> fmap Left pEndPos
+
+    pFailureOnOpen :: T.Parser (Either Integer (Maybe Digit, Integer))
+    pFailureOnOpen = Left 0 <$ string "0 endpos=0"
+
+    pSuccess  :: T.Parser (Either Integer (Maybe Digit, Integer))
+    pSuccess = string "0" >> pSpace >> fmap (\ep -> Right (Nothing, ep)) pEndPos
+
+    pSuccessWithDigit  :: T.Parser (Either Integer (Maybe Digit, Integer))
+    pSuccessWithDigit = (\digit int -> Right (Just digit, int))
+        <$> pAsciiDigit
+        <*  pSpace
+        <*> pEndPos
 
 {-
 Usage: WAIT FOR DIGIT <timeout>
@@ -384,14 +441,10 @@ success: 200 result=<digit>
 waitForDigit :: (MonadIO m)
              => Integer -- ^ timeout in milliseconds, -1 to block indefinitely
              -> AGIT m (Maybe (Maybe Digit)) -- ^ |Nothing| on error, |Just Nothing| on timeout, |Just (Just <digit>)| on success
-waitForDigit timeout =
-    do res <- sendRecv $ "WAIT FOR DIGIT " ++ show timeout
-       return $ parseResult p res
+waitForDigit = liftM (parseResult pMaybeDigit) . waitForDigit'
   where
-    p = do pResult
-           (string "-1" >> return Nothing) <|>
-             (string "0" >> return (Just Nothing)) <|>
-             liftM (Just . Just) pAsciiDigit
+    waitForDigit' :: (MonadIO m) => Integer -> AGIT m Text
+    waitForDigit' = sendRecv . mappend "WAIT FOR DIGIT " . T.pack . show
 
 {-
 Usage: EXEC Dial "IAX2/alice,20"
@@ -409,17 +462,19 @@ success: 200 result=<app_return_code>
 <app_return_code> - return code of execute application
 
 -}
-exec :: (MonadIO m) => String -> [String] -> AGIT m (Maybe Int)
+exec :: (MonadIO m) => Text -> [Text] -> AGIT m (Maybe Int)
 exec app []   = return Nothing
-exec app args =
-    do res <- sendRecv $ "EXEC " ++ app ++ " \"" ++ intercalate "," args ++ "\""
-       return $ parseResult p res
+exec app args = liftM (parseResult pReturnCode) exec'
   where
-    p = do pResult
-           (string "-2" >> return Nothing) <|>
-             (do retVal <- integer
-                 return $ Just retVal)
+    exec' :: (MonadIO m) => AGIT m Text
+    exec' = sendRecv $ T.concat
+        [
+            "EXEC ", app,
+            " \"", T.intercalate "," args, "\""
+        ]
 
+    pReturnCode :: T.Parser (Maybe Int)
+    pReturnCode = pResult >> (Nothing <$ string "-2" <|> liftM Just integer)
 
 {-
 Usage: SET CALLERID 12345
@@ -433,13 +488,10 @@ success: 200 result=1
 -}
 -- !!!!!!!!!!!! Change Int into CallerID or something like this
 setCallerID :: (MonadIO m) => Int -> AGIT m Bool
-setCallerID newCallerID = do
-    res <- sendRecv $ "SET CALLERID " ++ show newCallerID
-    return $ parseResult p res
+setCallerID = liftM (parseResult pBoolResult) . setCID
   where
-    p = do pResult
-           (string "1" >> return True) <|>
-             (digit >> return False)
+    setCID ::(MonadIO m) => Int -> AGIT m Text
+    setCID = sendRecv . mappend "SET CALLERID " . T.pack . show
 
 
 {-
@@ -453,13 +505,10 @@ success: 200 result=1
 
 -}
 setVariable :: (MonadIO m) => VariableName -> Variable -> AGIT m Bool
-setVariable varName var = do
-    res <- sendRecv $ "SET VARIABLE " ++ varName ++ " " ++ var
-    return $ parseResult p res
+setVariable varName var = liftM (parseResult pBoolResult) setVar
   where
-    p = do pResult
-           (string "1" >> return True) <|>
-             (digit >> return False)
+    setVar ::(MonadIO m) => AGIT m Text
+    setVar = sendRecv $ T.concat ["SET VARIABLE ", varName, " ", var]
 
 {-
 Usage: SET VARIABLE VARIABLENAME VALUE
@@ -472,17 +521,15 @@ success: 200 result=0
 
 -}
 setMusicOnHold :: (MonadIO m) => OnOff -> MusicOnHoldClass -> AGIT m Bool
-setMusicOnHold onOff musicClass = do
-    res <- sendRecv $ "SET MUSIC " ++ musicClass ++ " " ++ onOffStr
-    return $ parseResult p res
+setMusicOnHold onOff musicClass = liftM (parseResult pBoolResult) setOnHold
   where
-    onOffStr =
-        case onOff of
-            On ->  "ON"
-            Off -> "OFF"
-    p = do pResult
-           (string "0" >> return True) <|>
-             (digit >> return False)
+    setOnHold :: (MonadIO m) => AGIT m Text
+    setOnHold = sendRecv $
+      T.concat ["SET MUSIC ", musicClass, " ", onOffStr onOff]
+
+    onOffStr :: OnOff -> Text
+    onOffStr On = "ON"
+    onOffStr Off = "OFF"
 
 {-
 GET VARIABLE UNIQUEID
@@ -494,13 +541,18 @@ failure or not set: 200 result=0
 success: 200 result=1 <value>
 -}
 getVariable :: (MonadIO m) => VariableName -> AGIT m (Maybe Variable)
-getVariable variableName = do
-    res <- sendRecv $ "GET VARIABLE " ++ variableName
-    return $ parseResult p res
+getVariable = liftM (parseResult pMaybeVar) . setVar
   where
-    p = do pResult
-           (string "0" >> return Nothing) <|> pVariable
-    pVariable = do
+    setVar :: (MonadIO m) => Command -> AGIT m Text
+    setVar = sendRecv . mappend "GET VARIABLE "
+
+    pMaybeVar :: T.Parser (Maybe Variable)
+    pMaybeVar = pResult >> (pZero <|> pVariable)
+
+    pZero :: T.Parser (Maybe Variable)
+    pZero = Nothing <$ string "0"
+
+    pVariable :: T.Parser (Maybe Variable)
+    pVariable = liftM (Just . T.pack) $ do
         string "1 ("
-        var <- many $ noneOf ")"
-        return $ Just var
+        many $ noneOf ")"

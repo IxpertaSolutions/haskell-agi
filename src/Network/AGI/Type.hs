@@ -1,4 +1,6 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, DeriveDataTypeable #-}
+{-# LANGUAGE DeriveDataTypeable         #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings          #-}
 module Network.AGI.Type
     ( AGI
     , AGIEnv(..)
@@ -14,22 +16,20 @@ module Network.AGI.Type
     , VariableName
     ) where
 
-import Control.Monad
-import Control.Monad.Trans
-import Control.Monad.Reader
-import Control.Monad.Error
-import Data.Generics
-import System.Posix.Signals
-import System.IO
+import           Control.Monad.Error
+import           Control.Monad.Reader
+import           Data.Generics
+import           Data.Map
+import           Data.Text
+import           System.IO
 
-
-data AGIEnv = AGIEnv { agiVars :: [(String, String)]
-                     , agiInH :: Handle
+data AGIEnv = AGIEnv { agiVars :: Map Text Text
+                     , agiInH  :: Handle
                      , agiOutH :: Handle
                      }
 
 newtype AGIT m a = AGI { runAGIT :: ReaderT AGIEnv m a }
-    deriving (Monad, MonadIO, Functor, MonadReader AGIEnv)
+    deriving (Monad, MonadIO, Functor, MonadReader AGIEnv, MonadTrans)
 
 type AGI = AGIT IO
 
@@ -64,7 +64,7 @@ ppDigit Seven = '7'
 ppDigit Eight = '8'
 ppDigit Nine  = '9'
 
-type Command = String
+type Command = Text
 -- data Timeout =  Timeout Word (Maybe Word) -- ^ timeout, max digits
 
 data SoundType = WAV | GSM
@@ -81,12 +81,12 @@ data RecordResult
     | HangUp
     | Interrupted Digit
     | Timeout
-    | RandomError String
+    | RandomError Text
       deriving (Eq, Show, Data, Typeable)
 
-type Variable     = String
-type VariableName = String
+type Variable     = Text
+type VariableName = Text
 
 data OnOff = On | Off
 
-type MusicOnHoldClass = String
+type MusicOnHoldClass = Text
