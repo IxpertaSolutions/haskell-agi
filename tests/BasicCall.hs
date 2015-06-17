@@ -22,8 +22,8 @@ main =
 
 mainAGI :: HostName -> PortNumber -> AGI ()
 mainAGI _  _ = do
-    answer
+    _  <- answer
     ext <- lookupVar "agi_extension"
-    exec "DIAL" ["SIP/" <>  fromMaybe "Error" ext]
-    hangUp Nothing
+    _ <- exec "DIAL" ["SIP/" <>  fromMaybe "Error" ext]
+    _ <- hangUp Nothing
     return ()

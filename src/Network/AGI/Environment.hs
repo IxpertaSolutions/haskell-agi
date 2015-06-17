@@ -42,7 +42,7 @@ module Network.AGI.Environment
 
 import           Network.AGI.Type
 
-import           Control.Monad
+import           Control.Applicative
 import           Control.Monad.Reader
 import           Data.Map                   as M
 import           Data.Maybe
@@ -54,21 +54,21 @@ import           Data.Text.Lazy.Builder.Int
 
 
 -- | Name of the invoked AGI \"script\".
-agiScriptName :: (Monad m) => AGIT m Text
-agiScriptName = liftM fromJust $ lookupVar "agi_request"
+agiScriptName :: (Applicative m, Monad m) => AGIT m Text
+agiScriptName = fromJust <$> lookupVar "agi_request"
 
 -- | Originating channel, that mean channel in which context is running current
 -- AGI session.
-originatingChannel :: (Monad m) => AGIT m Text
-originatingChannel = liftM fromJust $ lookupVar "agi_channel"
+originatingChannel :: (Applicative m, Monad m) => AGIT m Text
+originatingChannel = fromJust <$> lookupVar "agi_channel"
 
 -- | Language code like \"en\".
-languageCode :: (Monad m) => AGIT m Text
-languageCode = liftM fromJust $ lookupVar "agi_language"
+languageCode :: (Applicative m, Monad m) => AGIT m Text
+languageCode = fromJust <$> lookupVar "agi_language"
 
 -- | Originating channel type. It can acquire values: SIP, ZAP ...
-originatingChannelType :: (Monad m) => AGIT m Text
-originatingChannelType = liftM fromJust $ lookupVar "agi_type"
+originatingChannelType :: (Applicative m, Monad m) => AGIT m Text
+originatingChannelType = fromJust <$> lookupVar "agi_type"
 
 -- | Return call unique ID in format \<epoch\>.\<monotonically incremented number\>
 -- example: 1165492430.2
@@ -76,26 +76,26 @@ originatingChannelType = liftM fromJust $ lookupVar "agi_type"
 -- There is some possibility of customising unique ID see:
 -- <http://lists.digium.com/pipermail/asterisk-users/2008-March/207108.html>
 --
-callUniqueID :: (Monad m) => AGIT m Text
-callUniqueID = liftM fromJust $ lookupVar  "agi_uniqueid"
+callUniqueID :: (Applicative m, Monad m) => AGIT m Text
+callUniqueID = fromJust <$> lookupVar  "agi_uniqueid"
 
-asteriskVersion :: (Monad m) => AGIT m Text
-asteriskVersion = liftM fromJust $ lookupVar "agi_version"
+asteriskVersion :: (Applicative m, Monad m) => AGIT m Text
+asteriskVersion = fromJust <$> lookupVar "agi_version"
 
 -- | Returns caller id number or \"unknown\".
 --
 -- TODO: Change return value to Maybe. If \"unknown\" is presented Nothing can
 -- be returned for easy and type safe pattern matching.
-callerIDNumber :: (Monad m) => AGIT m Text
-callerIDNumber = liftM fromJust $ lookupVar "agi_callerid"
+callerIDNumber :: (Applicative m, Monad m) => AGIT m Text
+callerIDNumber = fromJust <$> lookupVar "agi_callerid"
 
 
 -- | Returns caller id name or \"unknown\".
 --
 -- TODO: Change return value to Maybe. If "unknown" is presented Nothing can
 -- be returned for easy and type safe pattern matching.
-callerIDName :: (Monad m) => AGIT m Text
-callerIDName = liftM fromJust $ lookupVar "agi_calleridname"
+callerIDName :: (Applicative m, Monad m) => AGIT m Text
+callerIDName = fromJust <$> lookupVar "agi_calleridname"
 
 -- | The presentation for the caller ID in a ZAP channel.
 -- Probably only for ZAP channel.
@@ -124,23 +124,23 @@ callingTNS = lookupVar "agi_callingtns"
 --
 -- TODO: Change return value to Maybe. If "unknown" is presented Nothing can
 -- be returned for easy and type safe pattern matching.
-dialedNumber :: (Monad m) => AGIT m Text
-dialedNumber = liftM fromJust $ lookupVar "agi_dnid"
+dialedNumber :: (Applicative m, Monad m) => AGIT m Text
+dialedNumber = fromJust <$> lookupVar "agi_dnid"
 -- | The referring DNIS number or "unknown".
-referringDNIS :: (Monad m) => AGIT m Text
-referringDNIS = liftM fromJust $ lookupVar "agi_rdnis"
+referringDNIS :: (Applicative m, Monad m) => AGIT m Text
+referringDNIS = fromJust <$> lookupVar "agi_rdnis"
 
 -- | Originating context from extension.conf.
-originatingContext :: (Monad m) => AGIT m Text
-originatingContext = liftM fromJust $ lookupVar "agi_context"
+originatingContext :: (Applicative m, Monad m) => AGIT m Text
+originatingContext = fromJust <$> lookupVar "agi_context"
 
 -- | Extension number that is called by user.
-extension :: (Monad m) => AGIT m Text
-extension = liftM fromJust $ lookupVar "agi_extension"
+extension :: (Applicative m, Monad m) => AGIT m Text
+extension = fromJust <$> lookupVar "agi_extension"
 
 -- | The priority it was executed as in the dial plan.
-execPriority :: (Monad m) => AGIT m Text
-execPriority = liftM fromJust $ lookupVar "agi_priority"
+execPriority :: (Applicative m, Monad m) => AGIT m Text
+execPriority = fromJust <$> lookupVar "agi_priority"
 
 -- | Check if AGI connection is enhanced AGI version (EAGI).
 isEnhanced :: (Monad m) => AGIT m Bool
@@ -150,12 +150,12 @@ isEnhanced = lookupVar "agi_enhanced" >>= \v ->
     _          -> return False
 
 -- | Account code of the origin channel.
-accountCode :: (Monad m) => AGIT m Text
-accountCode = liftM fromJust $ lookupVar "agi_accountcode"
+accountCode :: (Applicative m, Monad m) => AGIT m Text
+accountCode = fromJust <$> lookupVar "agi_accountcode"
 
 -- | Thread ID of the AGI script.
-threadID :: (Monad m) => AGIT m Text
-threadID = liftM fromJust $ lookupVar "agi_threadid"
+threadID :: (Applicative m, Monad m) => AGIT m Text
+threadID = fromJust <$> lookupVar "agi_threadid"
 
 -- | Get arguments passed by AGI call form extension.conf.
 arg :: (Monad m) => Int -> AGIT m (Maybe Text)

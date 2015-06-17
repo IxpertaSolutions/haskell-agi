@@ -61,14 +61,15 @@ executable basic-call
     hs-source-dirs: tests
     main-is:        BasicCall.hs
     build-depends:
-          base              >= 4.6 && <4.8
-        , AGI == 3.0
+          base      >= 4.6 && <4.8
+        , AGI       == 3.0
         , unix
         , random
         , transformers
         , mtl
         , network
 
+    ghc-options: -Wall -fwarn-tabs
 
 -- source-repository head
 --    type:     darcs
