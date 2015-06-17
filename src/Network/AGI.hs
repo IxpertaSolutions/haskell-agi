@@ -51,9 +51,9 @@ digitsToInteger digits =
 --
 -- @ main = run yourAGI Ignore @
 run :: (MonadIO m) => AGIT m a -> Handler -> m a
-run agi hupHandler =
-    do liftIO $ installHandler sigHUP hupHandler Nothing
-       runInternal agi stdin stdout
+run agi hupHandler = do
+    _ <- liftIO $ installHandler sigHUP hupHandler Nothing
+    runInternal agi stdin stdout
 
 -- |Top-level for long running AGI scripts.
 --
@@ -68,13 +68,13 @@ run agi hupHandler =
 -- TODO: support a hang-up handler
 -- TODO: ability to listen on a specific IP address
 fastAGI :: Maybe PortID -> (HostName -> PortNumber -> AGI a) -> IO ()
-fastAGI portId agi =
-    do installHandler sigPIPE Ignore Nothing
-       s <- listenOn $ fromMaybe (PortNumber 4573) portId
-       forever
-          (do (h, hostname, portNum) <- accept s
-              forkIO $ runInternal (agi hostname portNum) h h >> hClose h)
-          `finally` sClose s
+fastAGI portId agi = do
+    _ <- installHandler sigPIPE Ignore Nothing
+    s <- listenOn $ fromMaybe (PortNumber 4573) portId
+    forever
+        (do (h, hostname, portNum) <- accept s
+            forkIO $ runInternal (agi hostname portNum) h h >> hClose h)
+        `finally` sClose s
 
 
 
