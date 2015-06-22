@@ -97,10 +97,10 @@ readAgiVars h = readAgiVars' M.empty
   where
     readAgiVars' :: Map Text Text -> IO (Map Text Text)
     readAgiVars' m = TIO.hGetLine h >>= \l ->
-      return $ case l of
-        "" -> m
-        _  -> let (k,v) = T.break (':'==) l
-              in M.insert k v m
+      case l of
+          "" -> return $ m
+          _  -> let (k,v) = T.break (':'==) l
+                in readAgiVars' $ M.insert k v m
 
 -- |send an AGI Command, and return the Response
 --
