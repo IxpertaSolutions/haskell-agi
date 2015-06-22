@@ -16,6 +16,7 @@ module Network.AGI.Type
     , VariableName
     ) where
 
+import           Control.Applicative
 import           Control.Monad.Error
 import           Control.Monad.Reader
 import           Data.Generics
@@ -29,7 +30,8 @@ data AGIEnv = AGIEnv { agiVars :: Map Text Text
                      }
 
 newtype AGIT m a = AGI { runAGIT :: ReaderT AGIEnv m a }
-    deriving (Monad, MonadIO, Functor, MonadReader AGIEnv, MonadTrans)
+    deriving
+        (Monad, MonadIO, Functor, MonadReader AGIEnv, MonadTrans, Applicative)
 
 type AGI = AGIT IO
 

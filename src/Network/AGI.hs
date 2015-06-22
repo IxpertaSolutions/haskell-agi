@@ -10,9 +10,9 @@ module Network.AGI
 
 import           Network.AGI.Type
 
+import           Control.Applicative
 import           Control.Concurrent
 import           Control.Exception      (finally)
-import           Control.Monad
 import           Control.Monad.Reader
 import           Data.Map               (Map)
 import qualified Data.Map               as M
@@ -105,9 +105,10 @@ readAgiVars h = readAgiVars' M.empty
 -- |send an AGI Command, and return the Response
 --
 -- this function provides the low-level send/receive functionality.
-sendRecv :: (MonadIO m) => Command -> AGIT m Text
-sendRecv cmd =
-    do inh  <- liftM agiInH ask
-       outh <- liftM agiOutH ask
-       liftIO $ do TIO.hPutStrLn inh cmd
-                   TIO.hGetLine outh
+sendRecv :: (Applicative m, MonadIO m) => Command -> AGIT m Text
+sendRecv cmd = do
+    inh  <- agiInH <$> ask
+    outh <- agiOutH <$> ask
+    liftIO $ do
+      _ <- TIO.hPutStrLn inh cmd
+      TIO.hGetLine outh
