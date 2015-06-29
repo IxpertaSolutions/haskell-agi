@@ -62,7 +62,7 @@ executable basic-call
     main-is:        BasicCall.hs
     build-depends:
           base      >= 4.6 && <4.8
-        , AGI       == 3.0
+        , AGI       == 3.0.*
         , unix
         , random
         , transformers
