@@ -13,6 +13,7 @@ distclean:
 
 .PHONY: doc
 doc: .cabal-sandbox
+	cabal configure
 	cabal haddock
 
 .cabal-sandbox:
