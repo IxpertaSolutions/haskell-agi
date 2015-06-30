@@ -44,6 +44,7 @@ library
       , syb
       , text
       , containers
+      , mmorph
 
     Exposed-modules:
             Network.AGI

@@ -19,6 +19,7 @@ module Network.AGI.Type
 import           Control.Applicative
 import           Control.Monad.Error
 import           Control.Monad.Reader
+import           Control.Monad.Morph
 import           Data.Generics
 import           Data.Map
 import           Data.Text
@@ -32,6 +33,9 @@ data AGIEnv = AGIEnv { agiVars :: Map Text Text
 newtype AGIT m a = AGI { runAGIT :: ReaderT AGIEnv m a }
     deriving
         (Monad, MonadIO, Functor, MonadReader AGIEnv, MonadTrans, Applicative)
+
+instance MFunctor AGIT where
+    hoist f m = AGI . ReaderT $ \r -> f (runReaderT (runAGIT m) r)
 
 type AGI = AGIT IO
 
@@ -92,3 +96,4 @@ type VariableName = Text
 data OnOff = On | Off
 
 type MusicOnHoldClass = Text
+
