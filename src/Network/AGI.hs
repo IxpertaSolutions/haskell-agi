@@ -18,6 +18,7 @@ import           Data.Map               (Map)
 import qualified Data.Map               as M
 import           Data.Maybe
 import           Data.Monoid
+import           Data.Char
 import           Data.Text              (Text)
 import qualified Data.Text              as T
 import qualified Data.Text.IO           as TIO
@@ -100,7 +101,8 @@ readAgiVars h = readAgiVars' M.empty
       case l of
           "" -> return $ m
           _  -> let (k,v) = T.break (':'==) l
-                in readAgiVars' $ M.insert k v m
+                in readAgiVars' $ M.insert k (T.dropWhile isGarbage v) m
+    isGarbage x = isSpace x || x == ':'
 
 -- |send an AGI Command, and return the Response
 --
