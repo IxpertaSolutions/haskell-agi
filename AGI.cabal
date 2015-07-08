@@ -48,9 +48,10 @@ library
 
     Exposed-modules:
             Network.AGI
-            Network.AGI.Type
-            Network.AGI.Functions
             Network.AGI.Environment
+            Network.AGI.ExecFunctions
+            Network.AGI.Functions
+            Network.AGI.Type
 
     ghc-options: -Wall -fwarn-tabs
 
