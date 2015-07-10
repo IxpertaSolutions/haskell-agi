@@ -458,15 +458,19 @@ success: 200 result=<app_return_code>
 
 -}
 exec :: (Applicative m, MonadIO m) => Text -> [Text] -> AGIT m (Maybe Int)
-exec _   []   = return Nothing
 exec app args = parseResult pReturnCode <$> exec'
   where
     exec' :: (Applicative m, MonadIO m) => AGIT m Text
     exec' = sendRecv $ T.concat
         [
             "EXEC ", app,
-            " \"", T.intercalate "," args, "\""
+            concatIfNotEmpty args [" \"", T.intercalate "," args, "\""]
         ]
+
+    concatIfNotEmpty :: [Text] -> [Text] -> Text
+    concatIfNotEmpty [] _  = ""
+    concatIfNotEmpty _  xs = T.concat xs
+
 
     pReturnCode :: T.Parser (Maybe Int)
     pReturnCode = pResult >> ((Nothing <$ string "-2") <|> (Just <$> integer))
