@@ -12,7 +12,12 @@ import           Network.AGI.Type
 
 import           Control.Applicative
 import           Control.Concurrent
-import           Control.Exception      (finally, bracketOnError)
+import           Control.Exception
+    ( bracketOnError
+    , catch
+    , finally
+    , IOException
+    )
 import           Control.Monad.Reader
 import           Data.Map               (Map)
 import qualified Data.Map               as M
@@ -26,19 +31,21 @@ import qualified Data.Text.Lazy         as LazyText
 import           Data.Text.Lazy.Builder
 
 import           Network.Socket
-    ( bind
-    , listen
-    , socket
-    , PortNumber
-    , SockAddr
-    , Family(..)
-    , SocketType(..)
-    , HostName
-    , defaultProtocol
+    ( AddrInfo (..)
+    , AddrInfoFlag (..)
+    , bind
     , close
-    , SockAddr(..)
-    , iNADDR_ANY
+    , defaultHints
+    , defaultProtocol
+    , Family (..)
+    , getAddrInfo
+    , HostName
+    , listen
     , maxListenQueue
+    , PortNumber
+    , ServiceName
+    , socket
+    , SocketType (..)
     )
 import           Network (accept)
 
@@ -87,20 +94,35 @@ run agi hupHandler = do
 -- some concurrency control for shared data.
 --
 -- TODO: support a hang-up handler
-fastAGI :: Maybe SockAddr -> (HostName -> PortNumber -> AGI a) -> IO ()
-fastAGI socketAddr agi = do
+fastAGI :: Maybe HostName -> Maybe ServiceName -> (HostName -> PortNumber -> AGI a) -> IO ()
+fastAGI addr port agi = do
     _ <- installHandler sigPIPE Ignore Nothing
-    bracketOnError
-        (socket AF_INET Stream defaultProtocol)
-        (close)
-        (\sock -> do
-            bind sock $ fromMaybe (SockAddrInet 4573 iNADDR_ANY) socketAddr
-            listen sock maxListenQueue
-            forever
-                (do (h, hostname, portNum) <- accept sock
-                    forkIO $ runInternal (agi hostname portNum) h h >> hClose h)
-                `finally` close sock
-        )
+    addr' <- getAddrInfo (Just hints) justHost justPort
+    tryAddrs addr'
+  where
+    hints = defaultHints { addrFlags = [AI_PASSIVE]
+                         , addrSocketType = Stream
+                         }
+    justHost = Just $ fromMaybe "localhost" addr
+    justPort = Just $ fromMaybe "4573" port
+
+    tryAddrs []     = error "bindSock: no addresses available"
+    tryAddrs [x]    = useAddr x
+    tryAddrs (x:xs) = catch (useAddr x)
+                            (\e -> let _ = e :: IOException in tryAddrs xs)
+
+    useAddr addr'' =
+        bracketOnError
+            (socket AF_INET Stream defaultProtocol)
+            (close)
+            (\sock -> do
+                bind sock $ addrAddress addr''
+                listen sock maxListenQueue
+                forever
+                    (do (h, hostname, portNum) <- accept sock
+                        forkIO $ runInternal (agi hostname portNum) h h >> hClose h)
+                    `finally` close sock
+            )
 
 
 
