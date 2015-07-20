@@ -18,7 +18,7 @@ import           Network.AGI.Type
 
 main :: IO ()
 main =
-       fastAGI (Just $ PortNumber 4000) mainAGI
+       fastAGI  Nothing mainAGI
 
 mainAGI :: HostName -> PortNumber -> AGI ()
 mainAGI _  _ = do
