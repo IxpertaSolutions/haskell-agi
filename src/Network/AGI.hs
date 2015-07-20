@@ -12,7 +12,7 @@ import           Network.AGI.Type
 
 import           Control.Applicative
 import           Control.Concurrent
-import           Control.Exception      (finally)
+import           Control.Exception      (finally, bracketOnError)
 import           Control.Monad.Reader
 import           Data.Map               (Map)
 import qualified Data.Map               as M
@@ -24,7 +24,24 @@ import qualified Data.Text              as T
 import qualified Data.Text.IO           as TIO
 import qualified Data.Text.Lazy         as LazyText
 import           Data.Text.Lazy.Builder
-import           Network
+
+import           Network.Socket
+    ( bind
+    , listen
+    , socket
+    , PortNumber
+    , SockAddr
+    , Family(..)
+    , SocketType(..)
+    , HostName
+    , defaultProtocol
+    , close
+    , SockAddr(..)
+    , iNADDR_ANY
+    , maxListenQueue
+    )
+import           Network (accept)
+
 import           System.IO
 import           System.Posix.Signals
 
@@ -62,20 +79,28 @@ run agi hupHandler = do
 --
 -- @ main = fastAGI Nothing yourAGI @
 --
+-- If Socket Address is not provided the fastAGI will listen on all ports and
+-- the Default port (4573) will be used.
+--
 -- You should be sure to compile with -threaded. Note that 'yourAGI'
 -- may be running simultaneously in multiple threads, so you will need
 -- some concurrency control for shared data.
 --
 -- TODO: support a hang-up handler
--- TODO: ability to listen on a specific IP address
-fastAGI :: Maybe PortID -> (HostName -> PortNumber -> AGI a) -> IO ()
-fastAGI portId agi = do
+fastAGI :: Maybe SockAddr -> (HostName -> PortNumber -> AGI a) -> IO ()
+fastAGI socketAddr agi = do
     _ <- installHandler sigPIPE Ignore Nothing
-    s <- listenOn $ fromMaybe (PortNumber 4573) portId
-    forever
-        (do (h, hostname, portNum) <- accept s
-            forkIO $ runInternal (agi hostname portNum) h h >> hClose h)
-        `finally` sClose s
+    bracketOnError
+        (socket AF_INET Stream defaultProtocol)
+        (close)
+        (\sock -> do
+            bind sock $ fromMaybe (SockAddrInet 4573 iNADDR_ANY) socketAddr
+            listen sock maxListenQueue
+            forever
+                (do (h, hostname, portNum) <- accept sock
+                    forkIO $ runInternal (agi hostname portNum) h h >> hClose h)
+                `finally` close sock
+        )
 
 
 
