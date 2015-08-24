@@ -42,7 +42,6 @@ import           Network.Socket
     , HostName
     , listen
     , maxListenQueue
-    , PortNumber
     , ServiceName
     , socket
     , SocketType (..)
@@ -94,7 +93,7 @@ run agi hupHandler = do
 -- some concurrency control for shared data.
 --
 -- TODO: support a hang-up handler
-fastAGI :: Maybe HostName -> Maybe ServiceName -> (HostName -> PortNumber -> AGI a) -> IO ()
+fastAGI :: Maybe HostName -> Maybe ServiceName -> AGI a -> IO ()
 fastAGI addr port agi = do
     _ <- installHandler sigPIPE Ignore Nothing
     addr' <- getAddrInfo (Just hints) justHost justPort
@@ -119,8 +118,8 @@ fastAGI addr port agi = do
                 bind sock $ addrAddress addr''
                 listen sock maxListenQueue
                 forever
-                    (do (h, hostname, portNum) <- accept sock
-                        forkIO $ runInternal (agi hostname portNum) h h >> hClose h)
+                    (do (h, _, _) <- accept sock
+                        forkIO $ runInternal agi h h >> hClose h)
                     `finally` close sock
             )
 

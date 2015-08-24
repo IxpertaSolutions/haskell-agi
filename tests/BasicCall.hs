@@ -8,7 +8,6 @@ module Main
 -- Standard Haskell Modules
 import           Data.Maybe
 import           Data.Monoid
-import           Network
 
 -- 3rd Party Modules
 import           Network.AGI
@@ -20,8 +19,8 @@ main :: IO ()
 main =
        fastAGI Nothing Nothing mainAGI
 
-mainAGI :: HostName -> PortNumber -> AGI ()
-mainAGI _  _ = do
+mainAGI :: AGI ()
+mainAGI = do
     _  <- answer
     ext <- lookupVar "agi_extension"
     _ <- exec "DIAL" ["SIP/" <>  fromMaybe "Error" ext]
