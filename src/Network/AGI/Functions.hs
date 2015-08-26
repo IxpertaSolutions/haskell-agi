@@ -519,8 +519,8 @@ Returns:
 success: 200 result=0
 
 -}
-setMusicOnHold :: (Applicative m, MonadIO m) => OnOff -> MusicOnHoldClass -> AGIT m Bool
-setMusicOnHold onOff musicClass = parseResult pBoolResult <$> setOnHold
+setMusicOnHold :: (Applicative m, MonadIO m) => OnOff -> MusicOnHoldClass -> AGIT m ()
+setMusicOnHold onOff musicClass = void setOnHold
   where
     setOnHold :: (Applicative m, MonadIO m) => AGIT m Text
     setOnHold = sendRecv $
