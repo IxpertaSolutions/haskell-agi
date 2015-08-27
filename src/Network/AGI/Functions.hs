@@ -9,7 +9,6 @@ module Network.AGI.Functions
     , record
     , sayDigits
     , sayNumber
-    , setMusicOnHold
     , setVariable
     , setCallerID
     , streamFile
@@ -508,27 +507,6 @@ setVariable varName var = parseResult pBoolResult <$> setVar
   where
     setVar ::(Applicative m, MonadIO m) => AGIT m Text
     setVar = sendRecv $ T.concat ["SET VARIABLE ", varName, " ", var]
-
-{-
-Usage: SET VARIABLE VARIABLENAME VALUE
-
-This function never fails.
-
-
-Returns:
-success: 200 result=0
-
--}
-setMusicOnHold :: (Applicative m, MonadIO m) => OnOff -> MusicOnHoldClass -> AGIT m ()
-setMusicOnHold onOff musicClass = void setOnHold
-  where
-    setOnHold :: (Applicative m, MonadIO m) => AGIT m Text
-    setOnHold = sendRecv $
-      T.concat ["SET MUSIC ", musicClass, " ", onOffStr onOff]
-
-    onOffStr :: OnOff -> Text
-    onOffStr On = "ON"
-    onOffStr Off = "OFF"
 
 {-
 GET VARIABLE UNIQUEID
